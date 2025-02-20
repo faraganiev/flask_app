@@ -1,0 +1,82 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card shadow-lg p-4">
+                <h2 class="text-center mb-4">Редактирование отчета</h2>
+                <form action="{{ url_for('edit_report', report_id=report.id) }}" method="post">
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Сумма по Z-отчёту:</label>
+                        <input type="number" name="z_report" class="form-control" value="{{ report.z_report }}" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">HUMO:</label>
+                        <input type="number" name="humo" class="form-control" value="{{ report.humo }}" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">UZCARD:</label>
+                        <input type="number" name="uzcard" class="form-control" value="{{ report.uzcard }}" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Наличные:</label>
+                        <input type="number" name="cash" class="form-control" value="{{ report.cash }}" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Click/Payme:</label>
+                        <input type="number" name="click_payme" class="form-control" value="{{ report.click_payme }}" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Причина редактирования:</label>
+                        <input type="text" name="reason" class="form-control" value="{{ report.reason }}" required>
+                    </div>
+
+                    <!-- Новые поля для ввода долгов -->
+                    <div class="mb-3" id="debtors-container">
+                        <label class="form-label fw-bold">Долги:</label>
+                        {% if report.debtor_names and report.debtor_amounts %}
+                            {% for name, amount in zip(report.debtor_names.split(';'), report.debtor_amounts.split(';')) %}
+                                <div class="debt-entry mb-2">
+                                    <input type="text" name="debtor_name[]" class="form-control mb-2" value="{{ name }}" placeholder="Имя">
+                                    <input type="number" name="debtor_amount[]" class="form-control" value="{{ amount }}" placeholder="Сумма">
+                                    <button type="button" class="btn btn-danger btn-sm remove-debtor-btn">Удалить</button>
+                                </div>
+                            {% endfor %}
+                        {% else %}
+                            <div class="debt-entry mb-2">
+                                <input type="text" name="debtor_name[]" class="form-control mb-2" placeholder="Имя">
+                                <input type="number" name="debtor_amount[]" class="form-control" placeholder="Сумма">
+                                <button type="button" class="btn btn-danger btn-sm remove-debtor-btn">Удалить</button>
+                            </div>
+                        {% endif %}
+                    </div>
+                    <button type="button" class="btn btn-secondary mb-3" id="add-debtor-btn">Добавить еще</button>
+
+                    <button type="submit" class="btn btn-primary w-100">Сохранить изменения</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    document.getElementById('add-debtor-btn').addEventListener('click', function() {
+        var container = document.getElementById('debtors-container');
+        var newEntry = document.createElement('div');
+        newEntry.classList.add('debt-entry', 'mb-2');
+        newEntry.innerHTML = `
+            <input type="text" name="debtor_name[]" class="form-control mb-2" placeholder="Имя">
+            <input type="number" name="debtor_amount[]" class="form-control" placeholder="Сумма">
+            <button type="button" class="btn btn-danger btn-sm remove-debtor-btn">Удалить</button>
+        `;
+        container.appendChild(newEntry);
+    });
+
+    document.getElementById('debtors-container').addEventListener('click', function(e) {
+        if (e.target && e.target.classList.contains('remove-debtor-btn')) {
+            e.target.parentElement.remove();
+        }
+    });
+</script>
+{% endblock %}

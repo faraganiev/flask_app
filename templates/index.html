@@ -1,0 +1,112 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card shadow-lg p-4">
+                <h2 class="text-center mb-4">Сдача выручки</h2>
+                <form action="/" method="post" enctype="multipart/form-data">
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Кассир:</label>
+                        <select name="cashier" class="form-select" required>
+                            <option value="" disabled selected>Выберите кассира</option>
+                            {% for cashier in cashiers %}
+                                <option value="{{ cashier.name }}">{{ cashier.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Сумма по Z-отчёту:</label>
+                        <input type="number" name="z_report" class="form-control" required>
+                        <label for="z_report_doc" class="form-label">Загрузить документ Z-отчета:</label>
+                        <input type="file" name="z_report_doc" class="form-control" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">HUMO:</label>
+                        <input type="number" name="humo" class="form-control" required>
+                        <label for="humo_receipt" class="form-label">Загрузить чек HUMO:</label>
+                        <input type="file" name="humo_receipt" class="form-control" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">UZCARD:</label>
+                        <input type="number" name="uzcard" class="form-control" required>
+                        <label for="uzcard_receipt" class="form-label">Загрузить чек UZCARD:</label>
+                        <input type="file" name="uzcard_receipt" class="form-control" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Наличные:</label>
+                        <input type="number" name="cash" class="form-control" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Click/Payme:</label>
+                        <input type="number" name="click_payme" class="form-control" required>
+                        <label for="click_receipts" class="form-label">Загрузить чеки Click/Payme:</label>
+                        <input type="file" name="click_receipts" class="form-control" multiple required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Смена:</label>
+                        <select name="shift" class="form-select" required>
+                            <option value="" disabled selected>Выберите смену</option>
+                            <option value="Утренняя">Утренняя</option>
+                            <option value="Дневная">Дневная</option>
+                            <option value="Вечерняя">Вечерняя</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Комментарии кассира:</label>
+                        <textarea name="comments" class="form-control" placeholder="Введите комментарий"></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Причина расхождения (если есть):</label>
+                        <input type="text" name="reason" class="form-control" placeholder="Например, ошибка в расчетах">
+                    </div>
+
+                    <!-- Новые поля для ввода долгов -->
+                    <div class="mb-3" id="debtors-container">
+                        <label class="form-label fw-bold">Долги:</label>
+                        <div class="debt-entry mb-2">
+                            <input type="text" name="debtor_name[]" class="form-control mb-2" placeholder="Имя">
+                            <input type="number" name="debtor_amount[]" class="form-control" placeholder="Сумма">
+                        </div>
+                    </div>
+                    <button type="button" class="btn btn-secondary mb-3" id="add-debtor-btn">Добавить еще</button>
+
+                    <!-- Ваша кнопка "Рассчитать" -->
+                    <button type="submit" class="btn btn-primary w-100">Рассчитать</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% if difference is not none %}
+<div class="container mt-4">
+    <div class="alert {% if difference == 0 %}alert-success{% elif difference < 0 %}alert-danger{% else %}alert-warning{% endif %}" role="alert">
+        <h4 class="alert-heading">Результат сверки:</h4>
+        <p>Разница: <strong>{{ difference }}</strong> сум</p>
+        {% if difference == 0 %}
+            <p class="mb-0">✅ Всё в порядке, сумма совпадает.</p>
+        {% elif difference < 0 %}
+            <p class="mb-0">⚠️ Недостача! Нужно проверить кассу.</p>
+        {% else %}
+            <p class="mb-0">⚠️ Пересорт! Проверьте данные.</p>
+        {% endif %}
+    </div>
+</div>
+{% endif %}
+
+<script>
+    document.getElementById('add-debtor-btn').addEventListener('click', function() {
+        var container = document.getElementById('debtors-container');
+        var newEntry = document.createElement('div');
+        newEntry.classList.add('debt-entry', 'mb-2');
+        newEntry.innerHTML = `
+            <input type="text" name="debtor_name[]" class="form-control mb-2" placeholder="Имя">
+            <input type="number" name="debtor_amount[]" class="form-control" placeholder="Сумма">
+        `;
+        container.appendChild(newEntry);
+    });
+</script>
+
+{% endblock %}

@@ -1,0 +1,88 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container mt-5 slide-in">
+    <h2 class="text-center mb-4">Итоговый отчет всех касс</h2>
+    
+    <!-- Форма для выбора даты -->
+    <form action="/summary" method="get" class="mb-4">
+        <div class="input-group shadow-sm">
+            <input type="date" name="date" class="form-control" value="{{ request.args.get('date') }}" required>
+            <button type="submit" class="btn btn-primary">Показать отчет</button>
+        </div>
+    </form>
+
+    <div class="d-flex justify-content-end mb-3">
+        <a href="{{ url_for('download_all_excel') }}" class="btn btn-primary shadow-sm"><i class="fas fa-download"></i> Скачать все отчеты</a>
+    </div>
+
+    <!-- Вставка стилей -->
+    <style>
+        .positive {
+            background-color: #d4edda;
+            color: #155724;
+        }
+        .negative {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+        .positive .arrow-up {
+            color: #28a745;
+        }
+        .negative .arrow-down {
+            color: #dc3545;
+        }
+    </style>
+
+    <div class="table-responsive shadow-sm p-3 mb-5 bg-body rounded">
+        <table class="table table-striped table-hover">
+            <thead class="thead-light">
+                <tr style="background-color: #f8f9fa; color: #333; box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);">
+                    <th>ID</th>
+                    <th>Кассир</th>
+                    <th>Смена</th>
+                    <th>Z-отчёт</th>
+                    <th><i class="fas fa-credit-card"></i> HUMO</th>
+                    <th><i class="fas fa-credit-card"></i> UZCARD</th>
+                    <th><i class="fas fa-money-bill-wave"></i> Наличные</th>
+                    <th><i class="fas fa-mobile-alt"></i> Click/Payme</th>
+                    <th>Разница</th>
+                    <th>Комментарии</th>
+                    <th>Причина</th>
+                    <th>Дата</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for report in reports %}
+                <tr class="{{ 'positive' if report.difference >= 0 else 'negative' }}">
+                    <td>{{ report.id }}</td>
+                    <td>{{ report.cashier }}</td>
+                    <td>{{ report.shift }}</td>
+                    <td>{{ '%.2f'|format(report.z_report) }}</td>
+                    <td>{{ '%.2f'|format(report.humo) }}</td>
+                    <td>{{ '%.2f'|format(report.uzcard) }}</td>
+                    <td>{{ '%.2f'|format(report.cash) }}</td>
+                    <td>{{ '%.2f'|format(report.click_payme) }}</td>
+                    <td>{{ '%.2f'|format(report.difference) }} <i class="{{ 'arrow-up fas fa-arrow-up' if report.difference >= 0 else 'arrow-down fas fa-arrow-down' }}"></i></td>
+                    <td>{{ report.comments }}</td>
+                    <td>{{ report.reason }}</td>
+                    <td>{{ report.timestamp.strftime('%d.%m.%Y %H:%M') }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <div class="mt-4">
+        <h4>Общий итог:</h4>
+        <ul class="list-group shadow-sm">
+            <li class="list-group-item">Общая сумма по Z-отчету: {{ '%.2f'|format(total_z_report) }} {{ settings.currency }}</li>
+            <li class="list-group-item">Общая сумма HUMO: {{ '%.2f'|format(total_humo) }} {{ settings.currency }}</li>
+            <li class="list-group-item">Общая сумма UZCARD: {{ '%.2f'|format(total_uzcard) }} {{ settings.currency }}</li>
+            <li class="list-group-item">Общая сумма наличных: {{ '%.2f'|format(total_cash) }} {{ settings.currency }}</li>
+            <li class="list-group-item">Общая сумма по Click/Payme: {{ '%.2f'|format(total_click_payme) }} {{ settings.currency }}</li>
+            <li class="list-group-item">Общая разница: {{ '%.2f'|format(total_difference) }} {{ settings.currency }}</li>
+        </ul>
+    </div>
+</div>
+{% endblock %}

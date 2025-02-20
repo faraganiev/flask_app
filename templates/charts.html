@@ -1,0 +1,14 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container mt-5 slide-in">
+    <h2 class="text-center mb-4">Графическое отображение данных</h2>
+    <div id="chart" class="mt-5"></div>
+</div>
+
+<script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+<script>
+    const graphData = { graph_jsonsafe };
+    Plotly.react('chart', graphData.data, graphData.layout);
+</script>
+{% endblock %}

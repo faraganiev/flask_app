@@ -1,0 +1,39 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card shadow-lg p-4">
+                <h2 class="text-center mb-4">Настройки</h2>
+                <form action="/settings" method="post">
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Валюта:</label>
+                        <select name="currency" class="form-control" required>
+                            <option value="сум" {% if settings.currency == 'сум' %}selected{% endif %}>Сум</option>
+                            <option value="USD" {% if settings.currency == 'USD' %}selected{% endif %}>USD</option>
+                            <option value="EUR" {% if settings.currency == 'EUR' %}selected{% endif %}>EUR</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Язык:</label>
+                        <select name="language" class="form-control" required>
+                            <option value="ru" {% if settings.language == 'ru' %}selected{% endif %}>Русский</option>
+                            <option value="en" {% if settings.language == 'en' %}selected{% endif %}>English</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Часовой пояс:</label>
+                        <select name="timezone" class="form-control" required>
+                            <option value="Asia/Tashkent" {% if settings.timezone == 'Asia/Tashkent' %}selected{% endif %}>Asia/Tashkent</option>
+                            <option value="Etc/GMT+5" {% if settings.timezone == 'Etc/GMT+5' %}selected{% endif %}>Etc/GMT+5</option>
+                            <!-- Добавьте другие необходимые часовые пояса -->
+                        </select>
+                    </div>
+                    <button type="submit" class="btn btn-primary w-100">Сохранить</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
