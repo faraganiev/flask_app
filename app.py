@@ -13,6 +13,7 @@ from database import db, CashierReport, User, Settings, Cashier
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.cell import MergedCell
+from sqlalchemy.sql import func
 
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///cashier_check.db'
@@ -166,63 +167,123 @@ def index():
     settings = Settings.query.first()
     return render_template('index.html', difference=difference, settings=settings, cashiers=cashiers)
 
-@app.route('/reports')
+from datetime import datetime
+from flask import request, flash
+
+@app.route('/reports', methods=['GET'])
 @login_required
 def reports():
-    query = CashierReport.query
+    start_date = request.args.get('start_date')
+    end_date = request.args.get('end_date')
+    cashier = request.args.get('cashier')
     search = request.args.get('search')
 
+    query = CashierReport.query
+
+    # Проверяем формат даты и фильтруем
+    if start_date:
+        try:
+            start_date_obj = datetime.strptime(start_date, '%Y-%m-%d').replace(hour=0, minute=0, second=0)
+            query = query.filter(CashierReport.timestamp >= start_date_obj)
+        except ValueError:
+            flash("Ошибка: Неверный формат даты", "error")
+
+    if end_date:
+        try:
+            end_date_obj = datetime.strptime(end_date, '%Y-%m-%d').replace(hour=23, minute=59, second=59)
+            query = query.filter(CashierReport.timestamp <= end_date_obj)
+        except ValueError:
+            flash("Ошибка: Неверный формат даты", "error")
+
+    # Фильтр по кассиру
+    if cashier:
+        query = query.filter(CashierReport.cashier == cashier)
+
+    # Фильтр по поиску
     if search:
         query = query.filter(
             (CashierReport.cashier.ilike(f'%{search}%')) |
             (CashierReport.shift.ilike(f'%{search}%')) |
-            (CashierReport.z_report.ilike(f'%{search}%')) |
-            (CashierReport.humo.ilike(f'%{search}%')) |
-            (CashierReport.uzcard.ilike(f'%{search}%')) |
-            (CashierReport.cash.ilike(f'%{search}%')) |
-            (CashierReport.click_payme.ilike(f'%{search}%')) |
-            (CashierReport.difference.ilike(f'%{search}%')) |
-            (CashierReport.comments.ilike(f'%{search}%')) |
-            (CashierReport.reason.ilike(f'%{search}%')) |
-            (CashierReport.timestamp.ilike(f'%{search}%'))
+            (CashierReport.comments.ilike(f'%{search}%'))
         )
 
     reports = query.all()
     settings = Settings.query.first()
     timezone = pytz.timezone(settings.timezone) if settings else pytz.timezone('Asia/Tashkent')
+
+    # Проверяем, есть ли данные
+    if not reports:
+        flash("⚠ Отчеты не найдены за выбранный период.", "warning")
+
+    # Применяем часовой пояс
     for report in reports:
         report.timestamp = report.timestamp.astimezone(timezone)
 
-    return render_template('reports.html', reports=reports, settings=settings, zip=zip)
+    return render_template('reports.html', reports=reports, cashiers=Cashier.query.all(), settings=settings)
 
+
+from datetime import datetime, timedelta
+from flask import request
 
 @app.route('/summary', methods=['GET'])
 @login_required
 def summary():
-    date_str = request.args.get('date')
-    if date_str:
-        selected_date = datetime.strptime(date_str, '%Y-%m-%d').date()
-    else:
-        selected_date = date.today()
+    # Получаем текущую дату
+    today = datetime.today().strftime('%Y-%m-%d')
 
+    # Получаем параметры запроса (если пользователь выбрал другую дату)
+    start_date = request.args.get('start_date', today)  # По умолчанию = сегодня
+    end_date = request.args.get('end_date', today)  # По умолчанию = сегодня
+
+    query = CashierReport.query
+
+    # Фильтр по дате (преобразуем в datetime)
+    start_date_obj = datetime.strptime(start_date, '%Y-%m-%d')
+    end_date_obj = datetime.strptime(end_date, '%Y-%m-%d').replace(hour=23, minute=59, second=59)
+
+    query = query.filter(CashierReport.timestamp >= start_date_obj,
+                         CashierReport.timestamp <= end_date_obj)
+
+    reports = query.all()
+
+    # Загружаем настройки
     settings = Settings.query.first()
-    timezone = pytz.timezone(settings.timezone) if settings else pytz.timezone('Asia/Tashkent')
+    if not settings:
+        settings = type('Settings', (), {"currency": "сум"})()
 
-    reports = CashierReport.query.filter(db.func.date(CashierReport.timestamp) == selected_date).all()
-    for report in reports:
-        report.timestamp = report.timestamp.astimezone(timezone)
+    # Считаем итоги
+    total_z_report = sum([r.z_report for r in reports])
+    total_humo = sum([r.humo for r in reports])
+    total_uzcard = sum([r.uzcard for r in reports])
+    total_cash = sum([r.cash for r in reports])
+    total_click_payme = sum([r.click_payme for r in reports])
+    total_difference = sum([r.difference for r in reports])
 
-    total_z_report = sum(report.z_report for report in reports)
-    total_humo = sum(report.humo for report in reports)
-    total_uzcard = sum(report.uzcard for report in reports)
-    total_cash = sum(report.cash for report in reports)
-    total_click_payme = sum(report.click_payme for report in reports)
-    total_difference = sum(report.difference for report in reports)
+    # Генерация данных для графика
+    graph_data = {
+        "data": [
+            {
+                "x": [r.timestamp.strftime('%d.%m.%Y') for r in reports],
+                "y": [r.z_report + r.humo + r.uzcard + r.cash + r.click_payme for r in reports],
+                "type": "bar",
+                "marker": {"color": "blue"}
+            }
+        ],
+        "layout": {
+            "title": "Выручка по дням",
+            "xaxis": {"title": "Дата"},
+            "yaxis": {"title": "Сумма"}
+        }
+    }
 
-    return render_template('summary.html', reports=reports, total_z_report=total_z_report,
-                           total_humo=total_humo, total_uzcard=total_uzcard, total_cash=total_cash,
-                           total_click_payme=total_click_payme, total_difference=total_difference,
-                           settings=settings)
+    return render_template('summary.html', reports=reports, settings=settings, 
+                           total_z_report=total_z_report, total_humo=total_humo, 
+                           total_uzcard=total_uzcard, total_cash=total_cash, 
+                           total_click_payme=total_click_payme, 
+                           total_difference=total_difference, 
+                           graph_json=graph_data, 
+                           selected_start_date=start_date, selected_end_date=end_date)
+
 
 @app.route('/settings', methods=['GET', 'POST'])
 @login_required
@@ -597,6 +658,83 @@ def generate_total_report_for_dates(start_date, end_date):
 
     return report_text
 
+
+
+from flask import render_template, redirect, url_for, request
+from flask_login import login_required, current_user
+from datetime import datetime, timedelta
+from sqlalchemy.sql import func
+from database import db, CashierReport, User, Settings, Cashier  # ✅ Исправленный импорт
+
+@app.route('/dashboard')
+@login_required
+def dashboard():
+    # Проверяем, админ ли это
+    if current_user.username != "admin":
+        return redirect(url_for('index'))  # Если не админ, отправляем на главную
+
+    # Считаем общую сумму денег в кассах
+    total_z_report = db.session.query(func.sum(CashierReport.z_report)).scalar() or 0
+    total_humo = db.session.query(func.sum(CashierReport.humo)).scalar() or 0
+    total_uzcard = db.session.query(func.sum(CashierReport.uzcard)).scalar() or 0
+    total_cash = db.session.query(func.sum(CashierReport.cash)).scalar() or 0
+    total_click_payme = db.session.query(func.sum(CashierReport.click_payme)).scalar() or 0
+
+    # Количество проблемных отчетов (где разница не 0)
+    problem_reports_count = CashierReport.query.filter(CashierReport.difference != 0).count()
+
+    # Пагинация (разбиение проблемных отчетов на страницы)
+    page = request.args.get('page', 1, type=int)  # Получаем текущую страницу (по умолчанию 1)
+    per_page = 10  # Количество отчетов на одной странице
+
+    # Получаем проблемные отчеты (все, но с разбиением по страницам)
+    problem_reports = (
+        CashierReport.query.filter(CashierReport.difference != 0)
+        .order_by(CashierReport.timestamp.desc())
+        .paginate(page=page, per_page=per_page, error_out=False)
+    )
+
+    # Лучший и худший кассир (по количеству отчетов)
+    best_cashier = (
+        db.session.query(CashierReport.cashier, func.count(CashierReport.id))
+        .group_by(CashierReport.cashier)
+        .order_by(func.count(CashierReport.id).desc())
+        .first()
+    )
+    worst_cashier = (
+        db.session.query(CashierReport.cashier, func.count(CashierReport.id))
+        .group_by(CashierReport.cashier)
+        .order_by(func.count(CashierReport.id).asc())
+        .first()
+    )
+
+    # Выручка за последние 7 дней (для графика)
+    last_7_days = datetime.utcnow() - timedelta(days=7)
+    sales_data = (
+        db.session.query(func.date(CashierReport.timestamp), func.sum(CashierReport.z_report))
+        .filter(CashierReport.timestamp >= last_7_days)
+        .group_by(func.date(CashierReport.timestamp))
+        .all()
+    )
+
+    graph_data = {
+        "labels": [str(date) for date, _ in sales_data],
+        "values": [total for _, total in sales_data],
+    }
+
+    return render_template(
+        "dashboard.html",
+        total_z_report=total_z_report,
+        total_humo=total_humo,
+        total_uzcard=total_uzcard,
+        total_cash=total_cash,
+        total_click_payme=total_click_payme,
+        problem_reports_count=problem_reports_count,
+        problem_reports=problem_reports,  # Теперь передаем объект с пагинацией!
+        best_cashier=best_cashier,
+        worst_cashier=worst_cashier,
+        graph_data=graph_data,
+    )
 
 if __name__ == '__main__':
     app.run(debug=True)

@@ -1,97 +1,74 @@
 {% extends 'base.html' %}
 
 {% block content %}
-<div class="container mt-5 slide-in">
-    <h2 class="text-center mb-4">Отчет сверки</h2>
-    
-    <!-- Форма поиска и фильтров -->
-    <form class="mb-4" method="get">
-        <div class="input-group">
-            <input type="text" class="form-control" name="search" placeholder="Поиск по кассиру, сумме и т.д." value="{{ request.args.get('search', '') }}">
-            <button class="btn btn-primary">Поиск</button>
+<div class="container mt-5">
+    <h2 class="text-center mb-4">📊 Отчеты сверки</h2>
+
+    <!-- Форма фильтрации -->
+    <form id="filter-form" class="row g-3 mb-4">
+        <div class="col-md-3">
+            <input type="date" id="start-date" name="start_date" class="form-control" placeholder="Дата с">
+        </div>
+        <div class="col-md-3">
+            <input type="date" id="end-date" name="end_date" class="form-control" placeholder="Дата по">
+        </div>
+        <div class="col-md-3">
+            <select id="cashier-filter" name="cashier" class="form-select">
+                <option value="">Все кассиры</option>
+                {% for cashier in cashiers %}
+                <option value="{{ cashier.name }}">{{ cashier.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-3">
+            <button type="submit" class="btn btn-primary w-100">Фильтровать</button>
         </div>
     </form>
 
-    <!-- Вставка стилей -->
-    <style>
-        .positive {
-            background-color: #d4edda;
-            color: #155724;
-        }
-        .negative {
-            background-color: #f8d7da;
-            color: #721c24;
-        }
-        .positive .arrow-up {
-            color: #28a745;
-        }
-        .negative .arrow-down {
-            color: #dc3545;
-        }
-    </style>
-
-    <div class="table-responsive shadow-sm p-3 mb-5 bg-body rounded">
-        <table class="table table-striped table-hover">
-            <thead class="thead-light">
-                <tr style="background-color: #f8f9fa; color: #333; box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);">
+    <!-- Таблица отчетов -->
+    <div class="table-responsive">
+        <table id="reports-table" class="table table-hover">
+            <thead class="table-light">
+                <tr>
                     <th>ID</th>
                     <th>Кассир</th>
                     <th>Смена</th>
                     <th>Z-отчёт</th>
-                    <th><i class="fas fa-credit-card"></i> HUMO</th>
-                    <th><i class="fas fa-credit-card"></i> UZCARD</th>
-                    <th><i class="fas fa-money-bill-wave"></i> Наличные</th>
-                    <th><i class="fas fa-mobile-alt"></i> Click/Payme</th>
+                    <th>HUMO</th>
+                    <th>UZCARD</th>
+                    <th>Наличные</th>
+                    <th>Click/Payme</th>
                     <th>Разница</th>
-                    <th>Комментарии</th>
-                    <th>Причина</th>
                     <th>Дата</th>
-                    <th>Должники</th>
-                    <th>Z-отчёт Документ</th>
-                    <th>Чек HUMO</th>
-                    <th>Чек UZCARD</th>
-                    <th>Чеки Click/Payme</th>
-                    <th>Excel</th>
+                    <th>Документы</th>
                     <th>Действия</th>
                 </tr>
             </thead>
             <tbody>
                 {% for report in reports %}
-                <tr class="{{ 'positive' if report.difference >= 0 else 'negative' }}">
+                <tr class="{% if report.difference < 0 %}table-danger{% elif report.difference > 0 %}table-warning{% else %}table-success{% endif %}">
                     <td>{{ report.id }}</td>
                     <td>{{ report.cashier }}</td>
                     <td>{{ report.shift }}</td>
-                    <td>{{ '%.2f'|format(report.z_report) }}</td>
-                    <td>{{ '%.2f'|format(report.humo) }}</td>
-                    <td>{{ '%.2f'|format(report.uzcard) }}</td>
-                    <td>{{ '%.2f'|format(report.cash) }}</td>
-                    <td>{{ '%.2f'|format(report.click_payme) }}</td>
-                    <td>{{ '%.2f'|format(report.difference) }} <i class="{{ 'arrow-up fas fa-arrow-up' if report.difference >= 0 else 'arrow-down fas fa-arrow-down' }}"></i></td>
-                    <td>{{ report.comments }}</td>
-                    <td>{{ report.reason }}</td>
-                    <td>{{ report.timestamp.strftime('%d.%m.%Y %H:%M') }}</td>
+                    <td>{{ report.z_report }}</td>
+                    <td>{{ report.humo }}</td>
+                    <td>{{ report.uzcard }}</td>
+                    <td>{{ report.cash }}</td>
+                    <td>{{ report.click_payme }}</td>
+                    <td>{{ report.difference }}</td>
+                    <td>{{ report.timestamp.strftime('%Y-%m-%d') }}</td>
                     <td>
-                        {% if report.debtor_names and report.debtor_amounts %}
-                            {% for name, amount in zip(report.debtor_names.split(';'), report.debtor_amounts.split(';')) %}
-                                <p>{{ name }}: {{ amount }} сум</p>
-                            {% endfor %}
-                        {% else %}
-                            <p>Нет долгов</p>
-                        {% endif %}
-                    </td>
-                    <td><a href="{{ url_for('uploaded_file', filename=report.z_report_doc) }}" target="_blank" class="btn btn-link"><i class="fas fa-file-alt"></i></a></td>
-                    <td><a href="{{ url_for('uploaded_file', filename=report.humo_receipt) }}" target="_blank" class="btn btn-link"><i class="fas fa-file-alt"></i></a></td>
-                    <td><a href="{{ url_for('uploaded_file', filename=report.uzcard_receipt) }}" target="_blank" class="btn btn-link"><i class="fas fa-file-alt"></i></a></td>
-                    <td>
+                        <a href="{{ url_for('uploaded_file', filename=report.z_report_doc) }}" class="btn btn-sm btn-outline-secondary" target="_blank">📄 Z</a>
+                        <a href="{{ url_for('uploaded_file', filename=report.humo_receipt) }}" class="btn btn-sm btn-outline-secondary" target="_blank">💳 H</a>
+                        <a href="{{ url_for('uploaded_file', filename=report.uzcard_receipt) }}" class="btn btn-sm btn-outline-secondary" target="_blank">💳 U</a>
                         {% for receipt in report.click_receipts.split(';') %}
-                            <a href="{{ url_for('uploaded_file', filename=receipt) }}" target="_blank" class="btn btn-link"><i class="fas fa-file-alt"></i> Чек {{ loop.index }}</a><br>
+                        <a href="{{ url_for('uploaded_file', filename=receipt) }}" class="btn btn-sm btn-outline-secondary" target="_blank">📱 C</a>
                         {% endfor %}
                     </td>
-                    <td><a href="{{ url_for('download_excel', report_id=report.id) }}" class="btn btn-primary btn-sm">Скачать Excel</a></td>
                     <td>
-                        <a href="{{ url_for('edit_report', report_id=report.id) }}" class="btn btn-warning btn-sm"><i class="fas fa-edit"></i></a>
-                        <form action="{{ url_for('delete_report', report_id=report.id) }}" method="post" style="display:inline;" onsubmit="return confirm('Вы уверены, что хотите удалить этот отчет?');">
-                            <button type="submit" class="btn btn-danger btn-sm"><i class="fas fa-trash-alt"></i></button>
+                        <a href="{{ url_for('edit_report', report_id=report.id) }}" class="btn btn-warning btn-sm">✏</a>
+                        <form action="{{ url_for('delete_report', report_id=report.id) }}" method="post" style="display:inline;" onsubmit="return confirm('Удалить отчет?');">
+                            <button type="submit" class="btn btn-danger btn-sm">🗑</button>
                         </form>
                     </td>
                 </tr>
@@ -100,4 +77,21 @@
         </table>
     </div>
 </div>
+
+<script>
+document.getElementById('filter-form').addEventListener('submit', function(event) {
+    event.preventDefault();
+    const startDate = document.getElementById('start-date').value;
+    const endDate = document.getElementById('end-date').value;
+    const cashier = document.getElementById('cashier-filter').value;
+    
+    let url = '/reports?';
+    if (startDate) url += `start_date=${startDate}&`;
+    if (endDate) url += `end_date=${endDate}&`;
+    if (cashier) url += `cashier=${cashier}`;
+    
+    window.location.href = url;
+});
+</script>
+
 {% endblock %}

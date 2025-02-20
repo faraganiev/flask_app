@@ -1,0 +1,125 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container mt-5">
+    <h2 class="text-center mb-4">📊 Дашборд руководителя</h2>
+
+    <!-- Основная информация -->
+    <div class="row text-center">
+        <div class="col-md-4">
+            <div class="card shadow-sm p-3 mb-3">
+                <h5>💰 Общая сумма в кассах</h5>
+                <p class="fs-4 fw-bold">{{ "%.2f"|format(total_z_report) }} сум</p>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card shadow-sm p-3 mb-3 bg-danger text-white">
+                <h5>⚠️ Проблемные отчеты</h5>
+                <p class="fs-4 fw-bold">{{ problem_reports_count }}</p>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card shadow-sm p-3 mb-3 bg-success text-white">
+                <h5>🏆 Лучший кассир</h5>
+                <p class="fs-5 fw-bold">{{ best_cashier[0] if best_cashier else 'Нет данных' }}</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Дополнительная информация -->
+    <div class="row text-center">
+        <div class="col-md-6">
+            <div class="card shadow-sm p-3 mb-3">
+                <h5>🔻 Худший кассир</h5>
+                <p class="fs-5 fw-bold">{{ worst_cashier[0] if worst_cashier else 'Нет данных' }}</p>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card shadow-sm p-3 mb-3">
+                <h5>💳 Распределение платежей</h5>
+                <p>HUMO: <strong>{{ "%.2f"|format(total_humo) }} сум</strong></p>
+                <p>UZCARD: <strong>{{ "%.2f"|format(total_uzcard) }} сум</strong></p>
+                <p>Наличные: <strong>{{ "%.2f"|format(total_cash) }} сум</strong></p>
+                <p>Click/Payme: <strong>{{ "%.2f"|format(total_click_payme) }} сум</strong></p>
+            </div>
+        </div>
+    </div>
+
+    <!-- График динамики продаж -->
+    <div class="mt-4">
+        <h4 class="text-center">📈 Динамика выручки за последние 7 дней</h4>
+        <canvas id="salesChart"></canvas>
+    </div>
+
+    <!-- Проблемные отчеты -->
+    <div class="mt-4">
+        <h4 class="text-center text-danger">⚠️ Проблемные отчеты</h4>
+        <div class="table-responsive">
+            <table class="table table-bordered">
+                <thead class="table-dark">
+                    <tr>
+                        <th>Кассир</th>
+                        <th>Дата</th>
+                        <th>Разница</th>
+                        <th>Комментарий</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for report in problem_reports.items %}
+                    <tr class="{{ 'table-danger' if report.difference < 0 else 'table-warning' }}">
+                        <td>{{ report.cashier }}</td>
+                        <td>{{ report.timestamp.strftime('%d.%m.%Y %H:%M') }}</td>
+                        <td>{{ "%.2f"|format(report.difference) }} сум</td>
+                        <td>{{ report.comments if report.comments else 'Нет комментария' }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Кнопки пагинации -->
+        <nav>
+            <ul class="pagination justify-content-center">
+                {% if problem_reports.has_prev %}
+                <li class="page-item">
+                    <a class="page-link" href="{{ url_for('dashboard', page=problem_reports.prev_num) }}">Назад</a>
+                </li>
+                {% endif %}
+                <li class="page-item disabled">
+                    <span class="page-link">Страница {{ problem_reports.page }} из {{ problem_reports.pages }}</span>
+                </li>
+                {% if problem_reports.has_next %}
+                <li class="page-item">
+                    <a class="page-link" href="{{ url_for('dashboard', page=problem_reports.next_num) }}">Далее</a>
+                </li>
+                {% endif %}
+            </ul>
+        </nav>
+    </div>
+</div>
+
+<!-- Подключаем Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    const ctx = document.getElementById('salesChart').getContext('2d');
+    const salesChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: { graph_datalabelstojson },
+            datasets: [{
+                label: 'Выручка (сум)',
+                data: { graph_datavaluestojson },
+                borderColor: 'blue',
+                backgroundColor: 'rgba(0, 0, 255, 0.1)',
+                borderWidth: 2
+            }]
+        },
+        options: {
+            responsive: true,
+            scales: {
+                y: { beginAtZero: true }
+            }
+        }
+    });
+</script>
+{% endblock %}
