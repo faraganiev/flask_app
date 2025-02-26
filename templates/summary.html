@@ -4,22 +4,31 @@
 <div class="container mt-5 slide-in">
     <h2 class="text-center mb-4">📊 Итоговый отчет всех касс</h2>
     
-    <!-- Форма для выбора диапазона дат -->
-    <form action="/summary" method="get" class="row g-3 mb-4">
-        <div class="col-md-4">
-            <input type="date" name="start_date" class="form-control" value="{{ selected_start_date }}" required>
-        </div>
-        <div class="col-md-4">
-            <input type="date" name="end_date" class="form-control" value="{{ selected_end_date }}" required>
-        </div>
-        <div class="col-md-4">
-            <button type="submit" class="btn btn-primary w-100">Показать отчет</button>
-        </div>
-    </form>    
+    <!-- Форма для выбора диапазона дат и смены -->
+<form action="/summary" method="get" class="row g-3 mb-4">
+    <div class="col-md-3">
+        <input type="date" id="start_date" name="start_date" class="form-control" value="{{ selected_start_date }}" required>
+    </div>
+    <div class="col-md-3">
+        <input type="date" id="end_date" name="end_date" class="form-control" value="{{ selected_end_date }}" required>
+    </div>
+    <div class="col-md-3">
+        <select id="shift_filter" name="shift" class="form-control">
+            <option value="" {% if not selected_shift %}selected{% endif %}>Все смены</option>
+            <option value="Утренняя" {% if selected_shift == 'Утренняя' %}selected{% endif %}>Утренняя</option>
+            <option value="Дневная" {% if selected_shift == 'Дневная' %}selected{% endif %}>Дневная</option>
+            <option value="Вечерняя" {% if selected_shift == 'Вечерняя' %}selected{% endif %}>Вечерняя</option>
+        </select>
+    </div>
+    <div class="col-md-3">
+        <button type="submit" class="btn btn-primary w-100">Показать отчет</button>
+    </div>
+</form>
+
 
     <!-- Кнопки скачивания -->
     <div class="d-flex justify-content-end mb-3">
-        <a href="{{ url_for('download_all_excel') }}" class="btn btn-success me-2"><i class="fas fa-file-excel"></i> Скачать Excel</a>
+        <a id="download_excel" href="#" class="btn btn-success me-2"><i class="fas fa-file-excel"></i> Скачать Excel</a>
     </div>
 
     <!-- Таблица итогов -->
@@ -51,7 +60,7 @@
                     <td>{{ '%.2f'|format(report.cash) }}</td>
                     <td>{{ '%.2f'|format(report.click_payme) }}</td>
                     <td>{{ '%.2f'|format(report.difference) }}</td>
-                    <td>{{ report.timestamp.strftime('%d.%m.%Y') }}</td>
+                    <td>{{ report.timestamp.strftime('%d.%m.%Y %H:%M') }}</td>
                 </tr>
                 {% endfor %}
             </tbody>
@@ -83,6 +92,28 @@
 <script>
     const graphData = { graph_jsontojsonsafe };
     Plotly.react('chart', graphData.data, graphData.layout);
+</script>
+
+<!-- ✅ Скрипт для кнопки скачивания Excel с фильтрацией по смене -->
+<script>
+    document.getElementById("download_excel").addEventListener("click", function (e) {
+        e.preventDefault();  // Останавливаем стандартный переход по ссылке
+
+        let startDate = document.getElementById("start_date").value;
+        let endDate = document.getElementById("end_date").value;
+        let shift = document.getElementById("shift_filter").value;  // Получаем выбранную смену
+
+        if (!startDate || !endDate) {
+            alert("Выберите диапазон дат!");
+            return;
+        }
+
+        // Формируем корректный URL с учетом смены
+        let downloadUrl = `/download_all_excel?start_date=${startDate}&end_date=${endDate}&shift=${shift}`;
+
+        // Переход по URL (скачивание Excel)
+        window.location.href = downloadUrl;
+    });
 </script>
 
 {% endblock %}
