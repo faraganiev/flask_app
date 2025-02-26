@@ -234,6 +234,7 @@ def summary():
     # Получаем параметры запроса (если пользователь выбрал другую дату)
     start_date = request.args.get('start_date', today)  # По умолчанию = сегодня
     end_date = request.args.get('end_date', today)  # По умолчанию = сегодня
+    selected_shift = request.args.get('shift', '')  # Получаем смену (по умолчанию все)
 
     query = CashierReport.query
 
@@ -243,6 +244,10 @@ def summary():
 
     query = query.filter(CashierReport.timestamp >= start_date_obj,
                          CashierReport.timestamp <= end_date_obj)
+
+    # Фильтрация по смене
+    if selected_shift:
+        query = query.filter(CashierReport.shift == selected_shift)
 
     reports = query.all()
 
@@ -282,7 +287,9 @@ def summary():
                            total_click_payme=total_click_payme, 
                            total_difference=total_difference, 
                            graph_json=graph_data, 
-                           selected_start_date=start_date, selected_end_date=end_date)
+                           selected_start_date=start_date, selected_end_date=end_date,
+                           selected_shift=selected_shift)  # Передаем выбранную смену
+
 
 
 @app.route('/settings', methods=['GET', 'POST'])
@@ -448,18 +455,51 @@ def download_excel(report_id):
 import io
 from flask import send_file
 
-@app.route('/download_all_excel')
+@app.route('/download_all_excel', methods=['GET'])
 @login_required
 def download_all_excel():
-    reports = CashierReport.query.all()
+    # ✅ Получаем параметры дат и смены из GET-запроса
+    start_date_str = request.args.get('start_date')
+    end_date_str = request.args.get('end_date')
+    selected_shift = request.args.get('shift')  # Получаем смену
+
+    try:
+        if not start_date_str or not end_date_str:
+            return "Ошибка: Укажите start_date и end_date.", 400
+
+        # ✅ Преобразуем строки в datetime, добавляем начало и конец дня
+        start_date = datetime.strptime(start_date_str, "%Y-%m-%d").replace(hour=0, minute=0, second=0)
+        end_date = datetime.strptime(end_date_str, "%Y-%m-%d").replace(hour=23, minute=59, second=59)
+
+        print(f"📅 Фильтруем отчеты с {start_date} по {end_date} | Смена: {selected_shift or 'Все смены'}")  # Логируем фильтрацию
+
+    except ValueError:
+        return "Ошибка: Некорректный формат даты! Используйте YYYY-MM-DD.", 400
+
+    # ✅ Фильтруем отчеты по дате и смене
+    query = CashierReport.query.filter(
+        CashierReport.timestamp >= start_date,
+        CashierReport.timestamp <= end_date
+    )
+
+    if selected_shift:  # ✅ Если смена выбрана, фильтруем
+        query = query.filter(CashierReport.shift == selected_shift)
+
+    reports = query.all()
+
+    print(f"🔍 Найдено записей: {len(reports)}")  # Логируем результат запроса
+
+    if not reports:
+        return "Нет отчетов за выбранный период.", 200
+
     settings = Settings.query.first()
 
-    # Создание Excel файла
+    # ✅ Создаем Excel-файл
     wb = Workbook()
     ws = wb.active
-    ws.title = "Все отчеты кассиров"
+    ws.title = f"Отчеты {start_date_str} - {end_date_str} ({selected_shift or 'Все смены'})"
 
-    # Настройка стилей
+    # ✅ Настройка стилей
     header_font = Font(bold=True, color="FFFFFF", size=12)
     header_fill = PatternFill(start_color="4F81BD", end_color="4F81BD", fill_type="solid")
     data_font = Font(size=11)
@@ -469,7 +509,7 @@ def download_all_excel():
     alignment_left = Alignment(horizontal="left", vertical="center")
     thin_border = Border(left=Side(style='thin'), right=Side(style='thin'), top=Side(style='thin'), bottom=Side(style='thin'))
 
-    # Заголовки таблицы
+    # ✅ Заголовки таблицы
     headers = ["ID", "Кассир", "Смена", "Z-отчёт", "HUMO", "UZCARD", "Наличные", "Click/Payme", "Разница", "Комментарии", "Причина", "Дата"]
     ws.append(headers)
 
@@ -480,7 +520,7 @@ def download_all_excel():
             cell.alignment = alignment_center
             cell.border = thin_border
 
-    # Заполнение данными
+    # ✅ Заполнение данными (только отфильтрованные записи)
     total_z_report = 0
     total_humo = 0
     total_uzcard = 0
@@ -499,9 +539,9 @@ def download_all_excel():
             report.cash,
             report.click_payme,
             report.difference,
-            report.comments,
-            report.reason,
-            report.timestamp.strftime('%d.%m.%Y %H:%M')
+            report.comments if report.comments else '—',
+            report.reason if report.reason else '—',
+            report.timestamp.strftime('%d.%m.%Y %H:%M')  # Теперь отображается и время
         ]
         ws.append(data)
 
@@ -512,14 +552,7 @@ def download_all_excel():
         total_click_payme += report.click_payme
         total_difference += report.difference
 
-    # Форматирование данных
-    for row in ws.iter_rows(min_row=2, max_col=len(headers), max_row=ws.max_row):
-        for cell in row:
-            cell.font = data_font
-            cell.alignment = alignment_left
-            cell.border = thin_border
-
-    # Итоговые суммы под каждой категорией
+    # ✅ Итоговые суммы под каждой категорией
     ws.append([""])
     ws.append(["Общие суммы"])
     ws.append(["Общая сумма по Z-отчету:", "", "", total_z_report])
@@ -529,7 +562,7 @@ def download_all_excel():
     ws.append(["Общая сумма по Click/Payme:", "", "", total_click_payme])
     ws.append(["Общая разница:", "", "", total_difference])
 
-    # Объединение ячеек и стиль итоговых строк
+    # ✅ Объединение ячеек и стиль итоговых строк
     for row in ws.iter_rows(min_row=ws.max_row - 6, max_col=4, max_row=ws.max_row):
         for cell in row:
             cell.font = bold_font
@@ -538,10 +571,10 @@ def download_all_excel():
             cell.border = thin_border
         ws.merge_cells(start_row=row[0].row, start_column=2, end_row=row[0].row, end_column=3)
 
-    # Настройка ширины колонок
+    # ✅ Настройка ширины колонок
     for col in ws.columns:
         max_length = 0
-        column = [cell for cell in col if not isinstance(cell, MergedCell)]
+        column = [cell for cell in col if not isinstance(cell, type(None))]
         for cell in column:
             try:
                 if len(str(cell.value)) > max_length:
@@ -551,12 +584,15 @@ def download_all_excel():
         adjusted_width = (max_length + 2)
         ws.column_dimensions[column[0].column_letter].width = adjusted_width
 
-    # Сохранение Excel файла во временное хранилище
+    # ✅ Сохранение Excel-файла во временное хранилище
     output = io.BytesIO()
     wb.save(output)
     output.seek(0)
 
-    return send_file(output, download_name='all_cashier_reports.xlsx', as_attachment=True)
+    # ✅ Скачиваемый файл теперь содержит название смены (если выбрана)
+    filename = f'report_{start_date_str}_to_{end_date_str}_{selected_shift or "all"}.xlsx'
+    
+    return send_file(output, download_name=filename, as_attachment=True)
 
 
 import plotly.graph_objs as go
